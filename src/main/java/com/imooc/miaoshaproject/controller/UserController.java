@@ -32,6 +32,11 @@ public class UserController  extends BaseController{
 
     @Autowired
     private HttpServletRequest httpServletRequest;
+    @GetMapping("")
+    @ResponseBody
+    public String getInfo(){
+        return "你好，访问成功";
+    }
 
 
 
