@@ -147,9 +147,47 @@
         </configuration>
       </plugin>
       <plugin>
-          <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <!--将依赖的jar拷贝至项目编译目录的lib文件夹中-->
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>false</overWriteSnapshots>
+              <overWriteIfNewer>true</overWriteIfNewer>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <!--        <version>3.1.0</version>-->
+        <configuration>
+          <archive>
+            <manifest>
+              <!-- 指定入口函数 -->
+              <mainClass>com.imooc.miaoshaproject.App</mainClass>
+              <!-- 是否添加依赖的jar路径配置 -->
+              <addClasspath>true</addClasspath>
+              <!-- 依赖的jar包存放位置，和生成的jar放在同一级目录下 -->
+              <classpathPrefix>lib/</classpathPrefix>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!--<plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>-->
     </plugins>
   </build>
 </project>
