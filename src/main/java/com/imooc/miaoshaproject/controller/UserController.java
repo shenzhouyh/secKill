@@ -8,6 +8,7 @@ import com.imooc.miaoshaproject.response.CommonReturnType;
 import com.imooc.miaoshaproject.service.model.UserModel;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,8 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by hzllb on 2018/11/11.
@@ -32,6 +35,11 @@ public class UserController  extends BaseController{
 
     @Autowired
     private HttpServletRequest httpServletRequest;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+
     @GetMapping("")
     @ResponseBody
     public String getInfo(){
@@ -148,7 +156,13 @@ public class UserController  extends BaseController{
         //将登陆凭证加入到用户登陆成功的session内
         this.httpServletRequest.getSession().setAttribute("IS_LOGIN",true);
         this.httpServletRequest.getSession().setAttribute("LOGIN_USER",userModel);
-
+        //登陆成功之后，将用户信息和登陆凭证存在到redis当中
+        //生成登录的token，使用UUID即可
+        String UUIDString = UUID.randomUUID().toString();
+        //建立token和用户登录态之间的联系
+        redisTemplate.opsForValue().set(UUIDString,userModel);
+        //设置超时时间
+        redisTemplate.expire(UUIDString,1, TimeUnit.HOURS);
         return CommonReturnType.create(null);
     }
 
