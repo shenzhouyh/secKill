@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import com.imooc.miaoshaproject.controller.viewobject.ItemVO;
 import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.response.CommonReturnType;
+import com.imooc.miaoshaproject.service.CommentCacheService;
 import com.imooc.miaoshaproject.service.model.ItemModel;
 import org.joda.time.format.DateTimeFormat;
 import org.springframework.beans.BeanUtils;
@@ -30,6 +31,8 @@ public class ItemController extends BaseController {
     private ItemService itemService;
     @Autowired
     private RedisTemplate redisTemplate;
+    @Autowired
+    private CommentCacheService cacheService;
 
     //创建商品的controller
     @RequestMapping(value = "/create",method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
@@ -57,13 +60,24 @@ public class ItemController extends BaseController {
     @RequestMapping(value = "/get",method = {RequestMethod.GET})
     @ResponseBody
     public CommonReturnType getItem(@RequestParam(name = "id")Integer id){
-        //从redis当中获取缓存数据
-        ItemModel itemModel = (ItemModel) redisTemplate.opsForValue().get("item_" + id);
-        if(itemModel==null){
-            itemModel = itemService.getItemById(id);
-            redisTemplate.opsForValue().set("item_"+id,itemModel);
-            redisTemplate.expire("item_"+id,10, TimeUnit.MINUTES);
-        }
+        ItemModel itemModel = null;
+        //先从本地获取缓存信息
+         itemModel = (ItemModel)cacheService.getCache("item_" + id);
+         //如果本地未获取数据，则从redis中读取缓存
+         if(itemModel==null){
+             //从redis当中获取缓存数据
+             itemModel = (ItemModel) redisTemplate.opsForValue().get("item_" + id);
+             if(itemModel==null){
+                 itemModel = itemService.getItemById(id);
+                 redisTemplate.opsForValue().set("item_"+id,itemModel);
+                 redisTemplate.expire("item_"+id,10, TimeUnit.MINUTES);
+             }
+             //将值存入到本地缓存当中
+             cacheService.setCache("item_" + id,itemModel);
+         }
+
+
+
 
         ItemVO itemVO = convertVOFromModel(itemModel);
 
