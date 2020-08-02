@@ -1,10 +1,10 @@
 package com.imooc.miaoshaproject.controller;
 
-import com.imooc.miaoshaproject.error.BusinessException;
-import com.imooc.miaoshaproject.service.UserService;
 import com.imooc.miaoshaproject.controller.viewobject.UserVO;
+import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.error.EmBusinessError;
 import com.imooc.miaoshaproject.response.CommonReturnType;
+import com.imooc.miaoshaproject.service.UserService;
 import com.imooc.miaoshaproject.service.model.UserModel;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;

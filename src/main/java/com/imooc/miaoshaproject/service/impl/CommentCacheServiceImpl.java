@@ -28,9 +28,6 @@ public void init(){
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .build();
     }
-
-
-
     /**
      * 获取缓存数据
      *
@@ -41,7 +38,6 @@ public void init(){
     public Object getCache(String key) {
         return cache.getIfPresent(key);
     }
-
     /**
      * 存储缓存数据
      *

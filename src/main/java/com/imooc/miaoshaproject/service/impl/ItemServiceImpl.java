@@ -14,11 +14,13 @@ import com.imooc.miaoshaproject.service.PromoService;
 import com.imooc.miaoshaproject.validator.ValidationResult;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -38,18 +40,21 @@ public class ItemServiceImpl implements ItemService {
 
     @Autowired
     private ItemStockDOMapper itemStockDOMapper;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
-    private ItemDO convertItemDOFromItemModel(ItemModel itemModel){
-        if(itemModel == null){
+    private ItemDO convertItemDOFromItemModel(ItemModel itemModel) {
+        if (itemModel == null) {
             return null;
         }
         ItemDO itemDO = new ItemDO();
-        BeanUtils.copyProperties(itemModel,itemDO);
+        BeanUtils.copyProperties(itemModel, itemDO);
         itemDO.setPrice(itemModel.getPrice().doubleValue());
         return itemDO;
     }
-    private ItemStockDO convertItemStockDOFromItemModel(ItemModel itemModel){
-        if(itemModel == null){
+
+    private ItemStockDO convertItemStockDOFromItemModel(ItemModel itemModel) {
+        if (itemModel == null) {
             return null;
         }
         ItemStockDO itemStockDO = new ItemStockDO();
@@ -134,13 +139,29 @@ public class ItemServiceImpl implements ItemService {
         itemDOMapper.increaseSales(itemId,amount);
     }
 
-    private ItemModel convertModelFromDataObject(ItemDO itemDO,ItemStockDO itemStockDO){
+    private ItemModel convertModelFromDataObject(ItemDO itemDO, ItemStockDO itemStockDO) {
         ItemModel itemModel = new ItemModel();
-        BeanUtils.copyProperties(itemDO,itemModel);
+        BeanUtils.copyProperties(itemDO, itemModel);
         itemModel.setPrice(new BigDecimal(itemDO.getPrice()));
         itemModel.setStock(itemStockDO.getStock());
 
         return itemModel;
     }
 
+    /**
+     * @param id 获取商品的缓存信息
+     * @return 商品信息
+     */
+    @Override
+    public ItemModel getItemByIdInCache(Integer id) {
+        //从redis中获取商品信息
+        ItemModel itemModel = (ItemModel) redisTemplate.opsForValue().get("item_model_cache_" + id);
+        if (itemModel == null) {
+            itemModel = getItemById(id);
+            redisTemplate.opsForValue().set("item_model_cache" + id, itemModel);
+            //设置十分钟过期时间
+            redisTemplate.expire("item_model_cache" + id, 10, TimeUnit.MINUTES);
+        }
+        return itemModel;
+    }
 }

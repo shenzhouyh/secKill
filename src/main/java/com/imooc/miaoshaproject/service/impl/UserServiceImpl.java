@@ -11,12 +11,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.imooc.miaoshaproject.dao.UserPasswordDOMapper;
 import com.imooc.miaoshaproject.dataobject.UserDO;
 import com.imooc.miaoshaproject.dataobject.UserPasswordDO;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by hzllb on 2018/11/11.
@@ -32,12 +35,14 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private ValidatorImpl validator;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @Override
     public UserModel getUserById(Integer id) {
         //调用userdomapper获取到对应的用户dataobject
         UserDO userDO = userDOMapper.selectByPrimaryKey(id);
-        if(userDO == null){
+        if (userDO == null) {
             return null;
         }
         //通过用户id获取对应的用户加密密码信息
@@ -118,12 +123,29 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         UserModel userModel = new UserModel();
-        BeanUtils.copyProperties(userDO,userModel);
+        BeanUtils.copyProperties(userDO, userModel);
 
-        if(userPasswordDO != null){
+        if (userPasswordDO != null) {
             userModel.setEncrptPassword(userPasswordDO.getEncrptPassword());
         }
 
+        return userModel;
+    }
+
+    /**
+     * 获取指定用户的缓存信息
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     */
+    @Override
+    public UserModel getUserByIdInCache(Integer id) {
+        UserModel userModel = (UserModel) redisTemplate.opsForValue().get("user_model_cache_" + id);
+        if (userModel == null) {
+            userModel = getUserById(id);
+            redisTemplate.opsForValue().set("user_model_cache_" + id, userModel);
+            redisTemplate.expire("user_model_cache_" + id, 10, TimeUnit.MINUTES);
+        }
         return userModel;
     }
 }
