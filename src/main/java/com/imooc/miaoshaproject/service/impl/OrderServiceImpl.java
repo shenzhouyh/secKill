@@ -1,6 +1,8 @@
 package com.imooc.miaoshaproject.service.impl;
 
 import com.imooc.miaoshaproject.dao.OrderDOMapper;
+import com.imooc.miaoshaproject.dao.SequenceDOMapper;
+import com.imooc.miaoshaproject.dataobject.OrderDO;
 import com.imooc.miaoshaproject.dataobject.SequenceDO;
 import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.error.EmBusinessError;
@@ -10,10 +12,9 @@ import com.imooc.miaoshaproject.service.UserService;
 import com.imooc.miaoshaproject.service.model.ItemModel;
 import com.imooc.miaoshaproject.service.model.OrderModel;
 import com.imooc.miaoshaproject.service.model.UserModel;
-import com.imooc.miaoshaproject.dao.SequenceDOMapper;
-import com.imooc.miaoshaproject.dataobject.OrderDO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,38 +40,40 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private OrderDOMapper orderDOMapper;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @Override
     @Transactional
     public OrderModel createOrder(Integer userId, Integer itemId, Integer promoId, Integer amount) throws BusinessException {
         //1.校验下单状态,下单的商品是否存在，用户是否合法，购买数量是否正确
         ItemModel itemModel = itemService.getItemByIdInCache(itemId);
-        if(itemModel == null){
-            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"商品信息不存在");
+        if (itemModel == null) {
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "商品信息不存在");
         }
 
         UserModel userModel = userService.getUserByIdInCache(userId);
-        if(userModel == null){
-            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"用户信息不存在");
+        if (userModel == null) {
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "用户信息不存在");
         }
-        if(amount <= 0 || amount > 99){
-            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"数量信息不正确");
+        if (amount <= 0 || amount > 99) {
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "数量信息不正确");
         }
 
         //校验活动信息
-        if(promoId != null){
+        if (promoId != null) {
             //（1）校验对应活动是否存在这个适用商品
-            if(promoId.intValue() != itemModel.getPromoModel().getId()){
-                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"活动信息不正确");
+            if (promoId.intValue() != itemModel.getPromoModel().getId()) {
+                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "活动信息不正确");
                 //（2）校验活动是否正在进行中
-            }else if(itemModel.getPromoModel().getStatus().intValue() != 2) {
-                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"活动信息还未开始");
+            } else if (itemModel.getPromoModel().getStatus().intValue() != 2) {
+                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "活动信息还未开始");
             }
         }
 
         //2.落单减库存
-        boolean result = itemService.decreaseStock(itemId,amount);
-        if(!result){
+        boolean result = itemService.decreaseStock(itemId, amount);
+        if (!result) {
             throw new BusinessException(EmBusinessError.STOCK_NOT_ENOUGH);
         }
 
@@ -79,9 +82,9 @@ public class OrderServiceImpl implements OrderService {
         orderModel.setUserId(userId);
         orderModel.setItemId(itemId);
         orderModel.setAmount(amount);
-        if(promoId != null){
+        if (promoId != null) {
             orderModel.setItemPrice(itemModel.getPromoModel().getPromoItemPrice());
-        }else{
+        } else {
             orderModel.setItemPrice(itemModel.getPrice());
         }
         orderModel.setPromoId(promoId);

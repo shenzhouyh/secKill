@@ -1,17 +1,17 @@
 package com.imooc.miaoshaproject.service.impl;
 
 import com.imooc.miaoshaproject.dao.ItemDOMapper;
+import com.imooc.miaoshaproject.dao.ItemStockDOMapper;
 import com.imooc.miaoshaproject.dataobject.ItemDO;
 import com.imooc.miaoshaproject.dataobject.ItemStockDO;
 import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.error.EmBusinessError;
-import com.imooc.miaoshaproject.service.model.ItemModel;
-import com.imooc.miaoshaproject.service.model.PromoModel;
-import com.imooc.miaoshaproject.validator.ValidatorImpl;
-import com.imooc.miaoshaproject.dao.ItemStockDOMapper;
 import com.imooc.miaoshaproject.service.ItemService;
 import com.imooc.miaoshaproject.service.PromoService;
+import com.imooc.miaoshaproject.service.model.ItemModel;
+import com.imooc.miaoshaproject.service.model.PromoModel;
 import com.imooc.miaoshaproject.validator.ValidationResult;
+import com.imooc.miaoshaproject.validator.ValidatorImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -120,16 +120,14 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public boolean decreaseStock(Integer itemId, Integer amount) throws BusinessException {
-        int affectedRow =  itemStockDOMapper.decreaseStock(itemId,amount);
-        if(affectedRow > 0){
-            //更新库存成功
-            return true;
-        }else{
-            //更新库存失败
-            return false;
-        }
+        int affectedRow = itemStockDOMapper.decreaseStock(itemId, amount);
+        //从Redis当中扣减库存
+        long result = redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, -1 * amount);
+        //更新库存成功
+        //更新库存失败
+        return result >= 0;
 
     }
 
