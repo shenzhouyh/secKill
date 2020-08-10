@@ -6,6 +6,7 @@ import com.imooc.miaoshaproject.dataobject.ItemDO;
 import com.imooc.miaoshaproject.dataobject.ItemStockDO;
 import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.error.EmBusinessError;
+import com.imooc.miaoshaproject.mq.Producer;
 import com.imooc.miaoshaproject.service.ItemService;
 import com.imooc.miaoshaproject.service.PromoService;
 import com.imooc.miaoshaproject.service.model.ItemModel;
@@ -42,6 +43,8 @@ public class ItemServiceImpl implements ItemService {
     private ItemStockDOMapper itemStockDOMapper;
     @Autowired
     private RedisTemplate redisTemplate;
+    @Autowired
+    private Producer producer;
 
     private ItemDO convertItemDOFromItemModel(ItemModel itemModel) {
         if (itemModel == null) {
@@ -125,10 +128,20 @@ public class ItemServiceImpl implements ItemService {
         int affectedRow = itemStockDOMapper.decreaseStock(itemId, amount);
         //从Redis当中扣减库存
         long result = redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, -1 * amount);
-        //更新库存成功
-        //更新库存失败
-        return result >= 0;
+        if (result >= 0) {
+            Boolean mqResult = producer.asyncReduceStock(itemId, amount);
+            if (!mqResult) {
+                //异步减库存失败，需要把redis中的库存加回来
+                redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, amount);
+                return false;
+            }
+            return true;
 
+        } else {
+            redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, amount);
+            return false;
+
+        }
     }
 
     @Override
