@@ -96,19 +96,26 @@ public class OrderServiceImpl implements OrderService {
         orderDOMapper.insertSelective(orderDO);
 
         //加上商品的销量
-        itemService.increaseSales(itemId,amount);
+        itemService.increaseSales(itemId, amount);
+
+        //异步扣减库存
+        boolean mqResult = itemService.asyncDecreaseStock(itemId, amount);
+        if (!mqResult) {
+            //异步减库存失败，需要把redis中的库存加回来
+            itemService.increaseStock(itemId, amount);
+        }
         //4.返回前端
         return orderModel;
     }
 
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private String generateOrderNo(){
+    String generateOrderNo() {
         //订单号有16位
         StringBuilder stringBuilder = new StringBuilder();
         //前8位为时间信息，年月日
         LocalDateTime now = LocalDateTime.now();
-        String nowDate = now.format(DateTimeFormatter.ISO_DATE).replace("-","");
+        String nowDate = now.format(DateTimeFormatter.ISO_DATE).replace("-", "");
         stringBuilder.append(nowDate);
 
         //中间6位为自增序列

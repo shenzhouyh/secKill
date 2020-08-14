@@ -20,16 +20,26 @@ public interface ItemService {
     ItemModel getItemById(Integer id);
 
     /**
-     *
      * @param id 获取商品的缓存信息
      * @return 商品信息
      */
     ItemModel getItemByIdInCache(Integer id);
 
     //库存扣减
-    boolean decreaseStock(Integer itemId,Integer amount)throws BusinessException;
+    boolean decreaseStock(Integer itemId, Integer amount) throws BusinessException;
+
+    /**
+     * 异步扣减库存
+     *
+     * @param itemId 商品ID
+     * @param amount 数量
+     * @return
+     */
+    boolean asyncDecreaseStock(Integer itemId, Integer amount);
+
+    boolean increaseStock(Integer itemId, Integer amount);
 
     //商品销量增加
-    void increaseSales(Integer itemId,Integer amount)throws BusinessException;
+    void increaseSales(Integer itemId, Integer amount) throws BusinessException;
 
 }
