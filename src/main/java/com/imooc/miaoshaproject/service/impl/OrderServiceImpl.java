@@ -18,8 +18,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -100,15 +98,15 @@ public class OrderServiceImpl implements OrderService {
         //加上商品的销量
         itemService.increaseSales(itemId, amount);
         //重写TransactionSynchronizationManager的afterCommit方法，使得MQ的发送放在整个事务的commit之后
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        /*TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 boolean mqResult = itemService.asyncDecreaseStock(itemId, amount);
-                /*if (!mqResult) {
+                *//*if (!mqResult) {
                     //异步减库存失败，需要把redis中的库存加回来
                     itemService.increaseStock(itemId, amount);
                     throw new BusinessException(EmBusinessError.MQ_SEND_FAIL);
-                }*/
+                }*//*
             }
         });
         //异步扣减库存
@@ -117,7 +115,7 @@ public class OrderServiceImpl implements OrderService {
             //异步减库存失败，需要把redis中的库存加回来
             itemService.increaseStock(itemId, amount);
             throw new BusinessException(EmBusinessError.MQ_SEND_FAIL);
-        }
+        }*/
         //4.返回前端
         return orderModel;
     }

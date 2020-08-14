@@ -1,11 +1,15 @@
 package com.imooc.miaoshaproject.mq;
 
 import com.alibaba.fastjson.JSON;
+import com.imooc.miaoshaproject.error.BusinessException;
+import com.imooc.miaoshaproject.service.OrderService;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
-import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.client.producer.*;
 import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.remoting.exception.RemotingException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,10 +25,15 @@ import java.util.Map;
 @Component
 public class Producer {
     private DefaultMQProducer mqProducer;
+
+    private TransactionMQProducer transactionMQProducer;
     @Value("${mq.nameserver.addr}")
     private String nameSrvAddr;
     @Value("${mq.topicname}")
     private String topic;
+
+    @Autowired
+    private OrderService orderService;
 
 
     @PostConstruct
@@ -34,8 +43,78 @@ public class Producer {
         mqProducer.setNamesrvAddr(nameSrvAddr);
         mqProducer.start();
 
+        //初始化transactionProducer
+        transactionMQProducer = new TransactionMQProducer("transaction_producer_group");
+        transactionMQProducer.setNamesrvAddr(nameSrvAddr);
+        transactionMQProducer.start();
+
+        transactionMQProducer.setTransactionListener(new TransactionListener() {
+            @Override
+            public LocalTransactionState executeLocalTransaction(Message message, Object o) {
+                //真正要做的事儿（创建订单）
+                //获取参数
+                Integer userId = (Integer) ((Map) o).get("userId");
+                Integer amount = (Integer) ((Map) o).get("amount");
+                Integer itemId = (Integer) ((Map) o).get("itemId");
+                Integer promoId = (Integer) ((Map) o).get("promoId");
+                try {
+                    orderService.createOrder(userId, itemId, promoId, amount);
+                } catch (BusinessException e) {
+                    e.printStackTrace();
+                    //如果发生异常,则将消息回滚
+                    return LocalTransactionState.ROLLBACK_MESSAGE;
+                }
+                //订单创建成功，将消息进行二次提交（原消息状态为prepare状态，不会被消费）
+                return LocalTransactionState.COMMIT_MESSAGE;
+            }
+
+            //根据库存是否扣减成功，来判断是否返回COMMIT、ROLLBACK、UNKNOWN
+            @Override
+            public LocalTransactionState checkLocalTransaction(MessageExt messageExt) {
+                String jsonString = new String(messageExt.getBody());
+                Map<String, Object> map = JSON.parseObject(jsonString, Map.class);
+                Integer orderId = (Integer) map.get("orderId");
+                Integer amount = (Integer) map.get("amount");
+                return null;
+            }
+        });
+
     }
 
+    public boolean transactionAsyncReduceStock(Integer userId, Integer itemId, Integer promoId, Integer amount) {
+        Map<String, Object> map = new HashMap<>(2);
+        map.put("amount", amount);
+        map.put("itemId", itemId);
+
+        Map<String, Object> argsMap = new HashMap<>(2);
+        argsMap.put("userId", userId);
+        argsMap.put("amount", amount);
+        argsMap.put("itemId", itemId);
+        argsMap.put("promoId", promoId);
+        Message message = new Message(nameSrvAddr, "decrease", JSON.toJSON(map).toString().getBytes(StandardCharsets.UTF_8));
+        TransactionSendResult transactionSendResult = null;
+        try {
+            transactionSendResult = transactionMQProducer.sendMessageInTransaction(message, argsMap);
+        } catch (MQClientException e) {
+            e.printStackTrace();
+            return false;
+        }
+        if (transactionSendResult.getLocalTransactionState() == LocalTransactionState.ROLLBACK_MESSAGE) {
+            return false;
+        } else if (transactionSendResult.getLocalTransactionState() == LocalTransactionState.COMMIT_MESSAGE) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * 异步扣减库存的producer
+     *
+     * @param orderId
+     * @param amount
+     * @return
+     */
     public Boolean asyncReduceStock(Integer orderId, Integer amount) {
         Map<String, Object> map = new HashMap<>(2);
         map.put("orderId", orderId);
