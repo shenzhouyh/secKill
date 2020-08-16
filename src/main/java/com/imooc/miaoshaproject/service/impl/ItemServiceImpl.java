@@ -138,7 +138,7 @@ public class ItemServiceImpl implements ItemService {
         } else if (result == 0) {
             //当库存为0时，需要增加售罄标识
             redisTemplate.opsForValue().set("promo_item_stock_invalid_" + itemId, true);
-
+            return true;
         } else {
             increaseStock(itemId, amount);
             return false;
