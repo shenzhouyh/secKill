@@ -133,8 +133,12 @@ public class ItemServiceImpl implements ItemService {
         int affectedRow = itemStockDOMapper.decreaseStock(itemId, amount);
         //从Redis当中扣减库存
         long result = redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, -1 * amount);
-        if (result >= 0) {
+        if (result > 0) {
             return true;
+        } else if (result == 0) {
+            //当库存为0时，需要增加售罄标识
+            redisTemplate.opsForValue().set("promo_item_stock_invalid_" + itemId, true);
+
         } else {
             increaseStock(itemId, amount);
             return false;
