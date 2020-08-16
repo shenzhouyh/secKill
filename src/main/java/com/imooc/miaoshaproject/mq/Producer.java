@@ -1,6 +1,8 @@
 package com.imooc.miaoshaproject.mq;
 
 import com.alibaba.fastjson.JSON;
+import com.imooc.miaoshaproject.dao.StockLogDOMapper;
+import com.imooc.miaoshaproject.dataobject.StockLogDO;
 import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.service.OrderService;
 import org.apache.rocketmq.client.exception.MQBrokerException;
@@ -34,6 +36,8 @@ public class Producer {
 
     @Autowired
     private OrderService orderService;
+    @Autowired
+    private StockLogDOMapper stockLogDOMapper;
 
 
     @PostConstruct
@@ -57,10 +61,16 @@ public class Producer {
                 Integer amount = (Integer) ((Map) o).get("amount");
                 Integer itemId = (Integer) ((Map) o).get("itemId");
                 Integer promoId = (Integer) ((Map) o).get("promoId");
+                String stockLogId = (String) ((Map) o).get("stockLogId");
                 try {
-                    orderService.createOrder(userId, itemId, promoId, amount);
+                    orderService.createOrder(userId, itemId, promoId, amount, stockLogId);
                 } catch (BusinessException e) {
                     e.printStackTrace();
+                    //需要更新库存流水记录的状态
+                    StockLogDO stockLogDO = stockLogDOMapper.selectByPrimaryKey(stockLogId);
+                    //下单成功扣减库存
+                    stockLogDO.setStatus(3);
+                    stockLogDOMapper.updateByPrimaryKey(stockLogDO);
                     //如果发生异常,则将消息回滚
                     return LocalTransactionState.ROLLBACK_MESSAGE;
                 }
@@ -73,10 +83,23 @@ public class Producer {
             public LocalTransactionState checkLocalTransaction(MessageExt messageExt) {
                 String jsonString = new String(messageExt.getBody());
                 Map<String, Object> map = JSON.parseObject(jsonString, Map.class);
-                Integer orderId = (Integer) map.get("orderId");
+                Integer itemId = (Integer) map.get("itemId");
                 Integer amount = (Integer) map.get("amount");
                 String stockLogId = (String) map.get("stockLogId");
-                return null;
+
+                StockLogDO stockLogDO = stockLogDOMapper.selectByPrimaryKey(stockLogId);
+                if (stockLogDO == null) {
+                    return LocalTransactionState.UNKNOW;
+                }
+                Integer status = stockLogDO.getStatus();
+                if (status == 1) {
+                    return LocalTransactionState.UNKNOW;
+                } else if (status == 2) {
+                    return LocalTransactionState.COMMIT_MESSAGE;
+                } else {
+                    return LocalTransactionState.ROLLBACK_MESSAGE;
+                }
+
             }
         });
 
