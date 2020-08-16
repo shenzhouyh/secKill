@@ -75,22 +75,26 @@ public class Producer {
                 Map<String, Object> map = JSON.parseObject(jsonString, Map.class);
                 Integer orderId = (Integer) map.get("orderId");
                 Integer amount = (Integer) map.get("amount");
+                String stockLogId = (String) map.get("stockLogId");
                 return null;
             }
         });
 
     }
 
-    public boolean transactionAsyncReduceStock(Integer userId, Integer itemId, Integer promoId, Integer amount) {
+    public boolean transactionAsyncReduceStock(Integer userId, Integer itemId,
+                                               Integer promoId, Integer amount, String stockLogId) {
         Map<String, Object> map = new HashMap<>(2);
         map.put("amount", amount);
         map.put("itemId", itemId);
+        map.put("stockLogId", stockLogId);
 
         Map<String, Object> argsMap = new HashMap<>(2);
         argsMap.put("userId", userId);
         argsMap.put("amount", amount);
         argsMap.put("itemId", itemId);
         argsMap.put("promoId", promoId);
+        argsMap.put("stockLogId", stockLogId);
         Message message = new Message(nameSrvAddr, "decrease", JSON.toJSON(map).toString().getBytes(StandardCharsets.UTF_8));
         TransactionSendResult transactionSendResult = null;
         try {

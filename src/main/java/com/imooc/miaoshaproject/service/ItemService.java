@@ -42,4 +42,12 @@ public interface ItemService {
     //商品销量增加
     void increaseSales(Integer itemId, Integer amount) throws BusinessException;
 
+    /**
+     * 记录指定商品的库存流水信息
+     *
+     * @param itemId 商品ID
+     * @param amount 商品当前库存
+     */
+    String initStockLog(Integer itemId, Integer amount);
+
 }
