@@ -15,6 +15,8 @@ public enum EmBusinessError implements CommonError {
     //30000开头为交易信息错误定义
     STOCK_NOT_ENOUGH(30001, "库存不足"),
     MQ_SEND_FAIL(30002, "MQ发送失败"),
+    PROMO_TOKEN_ERROR(30003, "token校验失败"),
+    GENERATE_TOKEN_ERROR(30004, "生成令牌失败"),
     ;
 
     private int errCode;

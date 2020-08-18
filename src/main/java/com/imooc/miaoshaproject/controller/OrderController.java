@@ -6,6 +6,7 @@ import com.imooc.miaoshaproject.mq.Producer;
 import com.imooc.miaoshaproject.response.CommonReturnType;
 import com.imooc.miaoshaproject.service.ItemService;
 import com.imooc.miaoshaproject.service.OrderService;
+import com.imooc.miaoshaproject.service.PromoService;
 import com.imooc.miaoshaproject.service.model.UserModel;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,13 +36,14 @@ public class OrderController extends BaseController {
     private Producer producer;
     @Autowired
     private ItemService itemService;
+    @Autowired
+    private PromoService promoService;
 
-    //封装下单请求
-    @RequestMapping(value = "/createorder", method = {RequestMethod.POST}, consumes = {CONTENT_TYPE_FORMED})
+    @RequestMapping(value = "/generateToken", method = {RequestMethod.POST}, consumes = {CONTENT_TYPE_FORMED})
     @ResponseBody
-    public CommonReturnType createOrder(@RequestParam(name = "itemId") Integer itemId,
-                                        @RequestParam(name = "amount") Integer amount,
-                                        @RequestParam(name = "promoId", required = false) Integer promoId) throws BusinessException {
+    public CommonReturnType generateToken(@RequestParam(name = "itemId") Integer itemId,
+                                          @RequestParam(name = "promoId", required = false) Integer promoId
+    ) throws BusinessException {
         String token = httpServletRequest.getParameterMap().get("token")[0];
         if (StringUtils.isBlank(token)) {
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
@@ -50,6 +52,39 @@ public class OrderController extends BaseController {
         UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
         if (userModel == null) {
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+        String generateToken = promoService.generateSecKillToken(promoId, itemId, userModel.getId());
+        if (generateToken == null) {
+            throw new BusinessException(EmBusinessError.GENERATE_TOKEN_ERROR, "生成令牌失败");
+        }
+        return CommonReturnType.create(generateToken);
+    }
+
+    //封装下单请求
+    @RequestMapping(value = "/createorder", method = {RequestMethod.POST}, consumes = {CONTENT_TYPE_FORMED})
+    @ResponseBody
+    public CommonReturnType createOrder(@RequestParam(name = "itemId") Integer itemId,
+                                        @RequestParam(name = "amount") Integer amount,
+                                        @RequestParam(name = "promoId", required = false) Integer promoId,
+                                        @RequestParam(name = "promoToken", required = false) String promoToken) throws BusinessException {
+
+
+        String token = httpServletRequest.getParameterMap().get("token")[0];
+        if (StringUtils.isBlank(token)) {
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+
+        UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
+        if (userModel == null) {
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+        //校验秒杀令牌是否正确
+        if (promoId != null) {
+            String redisToken = (String) redisTemplate.opsForValue().get("promo_token_" + promoId + "_userId" + userModel.getId() + "_itemId" + itemId);
+            if (redisToken == null || !redisToken.equals(promoToken)) {
+                throw new BusinessException(EmBusinessError.PROMO_TOKEN_ERROR, "用户还未登陆，不能下单");
+            }
+
         }
        /* Boolean isLogin = (Boolean) httpServletRequest.getSession().getAttribute("IS_LOGIN");
         if(isLogin == null || !isLogin.booleanValue()){

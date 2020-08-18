@@ -13,7 +13,6 @@ import com.imooc.miaoshaproject.service.OrderService;
 import com.imooc.miaoshaproject.service.UserService;
 import com.imooc.miaoshaproject.service.model.ItemModel;
 import com.imooc.miaoshaproject.service.model.OrderModel;
-import com.imooc.miaoshaproject.service.model.UserModel;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -56,17 +55,19 @@ public class OrderServiceImpl implements OrderService {
         if (itemModel == null) {
             throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "商品信息不存在");
         }
-
+/*
         UserModel userModel = userService.getUserByIdInCache(userId);
         if (userModel == null) {
             throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "用户信息不存在");
         }
+        */
+
         if (amount <= 0 || amount > 99) {
             throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "数量信息不正确");
         }
 
         //校验活动信息
-        if (promoId != null) {
+        /*if (promoId != null) {
             //（1）校验对应活动是否存在这个适用商品
             if (promoId.intValue() != itemModel.getPromoModel().getId()) {
                 throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "活动信息不正确");
@@ -74,7 +75,7 @@ public class OrderServiceImpl implements OrderService {
             } else if (itemModel.getPromoModel().getStatus().intValue() != 2) {
                 throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "活动信息还未开始");
             }
-        }
+        }*/
 
         //2.落单减库存
         boolean result = itemService.decreaseStock(itemId, amount);

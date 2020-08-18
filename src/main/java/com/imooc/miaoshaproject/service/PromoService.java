@@ -1,5 +1,6 @@
 package com.imooc.miaoshaproject.service;
 
+import com.imooc.miaoshaproject.error.BusinessException;
 import com.imooc.miaoshaproject.service.model.PromoModel;
 
 /**
@@ -15,4 +16,13 @@ public interface PromoService {
      * @param id
      */
     void publishPromo(Integer id);
+
+    /**
+     * 根据活动信息生成对应的令牌
+     *
+     * @param id
+     * @return
+     */
+    String generateSecKillToken(Integer promoId, Integer itemId, Integer userId) throws BusinessException;
+
 }
