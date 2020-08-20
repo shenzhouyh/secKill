@@ -17,6 +17,7 @@ public enum EmBusinessError implements CommonError {
     MQ_SEND_FAIL(30002, "MQ发送失败"),
     PROMO_TOKEN_ERROR(30003, "token校验失败"),
     GENERATE_TOKEN_ERROR(30004, "生成令牌失败"),
+    VERIFY_CODE_ERROR(30005, "验证码错误"),
     ;
 
     private int errCode;

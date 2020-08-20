@@ -8,6 +8,7 @@ import com.imooc.miaoshaproject.service.ItemService;
 import com.imooc.miaoshaproject.service.OrderService;
 import com.imooc.miaoshaproject.service.PromoService;
 import com.imooc.miaoshaproject.service.model.UserModel;
+import com.imooc.miaoshaproject.util.CodeUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -15,7 +16,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.awt.image.RenderedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.*;
 
 /**
@@ -50,6 +57,31 @@ public class OrderController extends BaseController {
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(5));
     }
 
+
+    @RequestMapping(value = "/verifycode", method = {RequestMethod.POST}, consumes = {CONTENT_TYPE_FORMED})
+    @ResponseBody
+    public void generateToken(HttpServletResponse response) throws BusinessException, IOException {
+        Map<String, Object> map = CodeUtil.generateCodeAndPic();
+        ImageIO.write((RenderedImage) map.get("codePic"), "jpeg", (File) response);
+        String code = (String) map.get("code");
+
+        String token = httpServletRequest.getParameterMap().get("token")[0];
+        if (StringUtils.isBlank(token)) {
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+
+        UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
+        if (userModel == null) {
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+        //将生成的验证码存入到redis当中
+
+        redisTemplate.opsForValue().set("verify_code_" + userModel.getId(), code);
+        //并设置过期时间
+        redisTemplate.expire("verify_code_" + userModel.getId(), 5, TimeUnit.MINUTES);
+
+    }
+
     @RequestMapping(value = "/generateToken", method = {RequestMethod.POST}, consumes = {CONTENT_TYPE_FORMED})
     @ResponseBody
     public CommonReturnType generateToken(@RequestParam(name = "itemId") Integer itemId,
@@ -77,8 +109,8 @@ public class OrderController extends BaseController {
     public CommonReturnType createOrder(@RequestParam(name = "itemId") Integer itemId,
                                         @RequestParam(name = "amount") Integer amount,
                                         @RequestParam(name = "promoId", required = false) Integer promoId,
-                                        @RequestParam(name = "promoToken", required = false) String promoToken) throws BusinessException {
-
+                                        @RequestParam(name = "promoToken", required = false) String promoToken,
+                                        @RequestParam(name = "code", required = false) String code) throws BusinessException {
 
         String token = httpServletRequest.getParameterMap().get("token")[0];
         if (StringUtils.isBlank(token)) {
@@ -88,6 +120,16 @@ public class OrderController extends BaseController {
         UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
         if (userModel == null) {
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN, "用户还未登陆，不能下单");
+        }
+
+        //检验验证码
+        if (StringUtils.isBlank(code)) {
+            throw new BusinessException(EmBusinessError.VERIFY_CODE_ERROR, "验证码校验失败");
+        }
+        //获取redis中的验证码
+        String codeInRedis = (String) redisTemplate.opsForValue().get("verify_code_" + userModel.getId());
+        if (!code.equalsIgnoreCase(codeInRedis)) {
+            throw new BusinessException(EmBusinessError.VERIFY_CODE_ERROR, "验证码校验失败");
         }
         //校验秒杀令牌是否正确
         if (promoId != null) {
